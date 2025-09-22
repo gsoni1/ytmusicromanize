@@ -1,7 +1,14 @@
-/* YouTube Music Romanize Button - Inside Lyrics Tab */
+/* YouTube Music Romanize Button - Inline with Lyrics Text */
+.tab-content.style-scope.tp-yt-paper-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 #romanized-lyrics-btn.romanize-tab-button {
-  display: block;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
   padding: 2px 8px;
   background: rgba(255, 255, 255, 0.1);
   border: none;
@@ -15,6 +22,7 @@
   white-space: nowrap;
   box-sizing: border-box;
   outline: none;
+  flex-shrink: 0;
 }
 
 #romanized-lyrics-btn.romanize-tab-button:hover {
