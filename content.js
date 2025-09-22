@@ -235,19 +235,12 @@ function showOriginalLyrics() {
 // Wait for the page to load and inject the Romanized lyrics button
 function injectRomanizedButton() {
   // Check if button already exists to avoid duplicates
-  if (document.querySelector('.lyrics-av-toggle')) {
+  if (document.querySelector('#romanized-lyrics-btn')) {
     return;
   }
 
-  // Look for the lyrics tab - try multiple selectors
+  // Look for the lyrics tab
   let lyricsTab = null;
-  const possibleSelectors = [
-    'tp-yt-paper-tab .tab-content:contains("Lyrics")',
-    'tp-yt-paper-tab[aria-selected="true"] .tab-content',
-    '.tab-header.iron-selected .tab-content'
-  ];
-
-  // Find lyrics tab by checking text content
   const allTabs = document.querySelectorAll('tp-yt-paper-tab');
   for (const tab of allTabs) {
     const tabContent = tab.querySelector('.tab-content');
@@ -263,38 +256,23 @@ function injectRomanizedButton() {
     return;
   }
 
-  // Find the tabs container - look for the parent that contains all tabs
-  let tabsContainer = lyricsTab.parentElement;
-  
-  // Try to find a better container if the immediate parent doesn't seem right
-  if (tabsContainer && !tabsContainer.classList.contains('tabs')) {
-    const possibleContainer = lyricsTab.closest('tp-yt-paper-tabs, .tabs-container, [role="tablist"]');
-    if (possibleContainer) {
-      tabsContainer = possibleContainer;
-    }
-  }
-  
-  if (!tabsContainer) {
+  // Find the tab-content div where we'll add the button
+  const tabContentDiv = lyricsTab.querySelector('.tab-content');
+  if (!tabContentDiv) {
     setTimeout(injectRomanizedButton, 1000);
     return;
   }
 
-  // Create the romanize button container
-  const buttonContainer = document.createElement('div');
-  buttonContainer.className = 'lyrics-av-toggle style-scope ytmusic-av-toggle';
-
   // Create the Romanized lyrics button
   const romanizedButton = document.createElement('button');
   romanizedButton.id = 'romanized-lyrics-btn';
-  romanizedButton.className = 'romanize-button style-scope ytmusic-av-toggle';
+  romanizedButton.className = 'romanize-tab-button style-scope tp-yt-paper-tab';
   romanizedButton.setAttribute('aria-pressed', 'false');
   romanizedButton.textContent = 'Romanize';
-  
-  // Add button to container
-  buttonContainer.appendChild(romanizedButton);
 
   // Add click event listener for romanization functionality
-  romanizedButton.addEventListener('click', function() {
+  romanizedButton.addEventListener('click', function(e) {
+    e.stopPropagation(); // Prevent tab switching when clicking the button
     console.log('Romanized button clicked!');
     const isPressed = romanizedButton.getAttribute('aria-pressed') === 'true';
     romanizedButton.setAttribute('aria-pressed', !isPressed);
@@ -308,14 +286,8 @@ function injectRomanizedButton() {
     }
   });
 
-  // Try different insertion strategies
-  if (tabsContainer.tagName === 'TP-YT-PAPER-TABS') {
-    // If it's the actual tabs container, append as a sibling element
-    tabsContainer.parentElement.insertBefore(buttonContainer, tabsContainer.nextSibling);
-  } else {
-    // Otherwise, insert after the lyrics tab
-    tabsContainer.insertBefore(buttonContainer, lyricsTab.nextSibling);
-  }
+  // Insert the button into the tab-content div below the "Lyrics" text
+  tabContentDiv.appendChild(romanizedButton);
 }
 
 // Run when DOM is ready
@@ -395,16 +367,17 @@ setInterval(() => {
   }
 }, 1000);
 
-// Watch for changes in the DOM (in case the lyrics section loads dynamically)
+// Watch for changes in the DOM (in case the lyrics tab loads dynamically)
 const observer = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
     if (mutation.type === 'childList') {
-      // Check if lyrics-related elements were added
+      // Check if lyrics tab elements were added
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           if (node.querySelector && (
             node.querySelector('tp-yt-paper-tab') || 
-            node.classList && node.classList.contains('tab-header')
+            node.classList && node.classList.contains('tab-header') ||
+            node.querySelector('.tab-content')
           )) {
             setTimeout(injectRomanizedButton, 500);
           }
