@@ -232,6 +232,27 @@ function showOriginalLyrics() {
   }
 }
 
+// Function to check if the romanize button should be shown
+function shouldShowRomanizeButton() {
+  // First, try to find and cache lyrics if not already done
+  if (!findAndStoreLyrics()) {
+    console.log('No lyrics found, hiding romanize button');
+    return false;
+  }
+
+  // Check if lyrics contain non-Latin text that needs romanization
+  const lyricsText = originalLyricsText || lyricsElement.textContent;
+  const nonLatinText = extractNonLatinText(lyricsText);
+  
+  if (!nonLatinText) {
+    console.log('Lyrics are already in English characters, hiding romanize button');
+    return false;
+  }
+
+  console.log('Non-Latin text found, showing romanize button');
+  return true;
+}
+
 // Wait for the page to load and inject the Romanized lyrics button
 function injectRomanizedButton() {
   // Check if button already exists to avoid duplicates
@@ -260,6 +281,12 @@ function injectRomanizedButton() {
   const tabContentDiv = lyricsTab.querySelector('.tab-content');
   if (!tabContentDiv) {
     setTimeout(injectRomanizedButton, 1000);
+    return;
+  }
+
+  // Check if lyrics are available and need romanization
+  if (!shouldShowRomanizeButton()) {
+    console.log('Romanize button not needed - lyrics are already in English or not found');
     return;
   }
 
@@ -320,11 +347,11 @@ function resetExtensionState() {
   originalLyricsText = null;
   lyricsElement = null;
   
-  // Reset any existing button states
+  // Remove any existing button since we'll re-evaluate if it's needed
   const existingRomanizedButton = document.querySelector('#romanized-lyrics-btn');
   if (existingRomanizedButton) {
-    existingRomanizedButton.setAttribute('aria-pressed', 'false');
-    existingRomanizedButton.textContent = 'Romanize';
+    existingRomanizedButton.remove();
+    console.log('Removed existing romanize button for new song');
   }
   
   // Force a refresh of the lyrics area to ensure new content is visible
