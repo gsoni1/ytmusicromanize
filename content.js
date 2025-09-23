@@ -99,13 +99,6 @@ async function findAndStoreLyrics() {
     return false;
   }
   
-  // First, check if YouTube Music is showing "Lyrics not available" message
-  const noLyricsMessage = document.querySelector('yt-formatted-string.text.style-scope.ytmusic-message-renderer');
-  if (noLyricsMessage && noLyricsMessage.textContent.includes('Lyrics not available')) {
-    console.log('❌ YouTube Music shows "Lyrics not available" message');
-    return false;
-  }
-  
   // Check if element exists in DOM
   lyricsElement = document.querySelector(lyricsSelector);
   console.log('Found lyrics element:', lyricsElement);
@@ -145,13 +138,6 @@ async function findAndStoreLyrics() {
       
       // Re-check the lyrics element after tab switch
       lyricsElement = document.querySelector(lyricsSelector);
-      
-      // Also check if "Lyrics not available" message appeared after tab switch
-      const noLyricsMessageAfterSwitch = document.querySelector('yt-formatted-string.text.style-scope.ytmusic-message-renderer');
-      if (noLyricsMessageAfterSwitch && noLyricsMessageAfterSwitch.textContent.includes('Lyrics not available')) {
-        console.log('❌ "Lyrics not available" message shown after tab switch');
-        return false;
-      }
       
       if (!lyricsElement || lyricsElement.hasAttribute('is-empty') || lyricsElement.textContent.trim().length === 0) {
         console.log('❌ Lyrics still not loaded after tab switch');
@@ -321,10 +307,67 @@ async function reloadLyricsWithTabSwitch() {
 async function showRomanizedLyrics() {
   console.log('showRomanizedLyrics called');
   
+  // Always try to find lyrics, but don't let it block the functionality
   const lyricsFound = await findAndStoreLyrics();
+  
   if (!lyricsFound) {
-    console.log('Lyrics not found, retrying...');
-    setTimeout(showRomanizedLyrics, 1000);
+    console.log('No lyrics available for romanization, showing helpful message');
+    
+    // Show a message in any available content area
+    const possibleContainers = [
+      document.querySelector('ytmusic-description-shelf-renderer'),
+      document.querySelector('[role="tabpanel"]'),
+      document.querySelector('.tab-content-wrapper'),
+      document.querySelector('#main-panel'),
+      document.querySelector('.ytmusic-player-page')
+    ];
+    
+    const lyricsContainer = possibleContainers.find(container => container !== null);
+    
+    if (lyricsContainer) {
+      const messageContainer = document.createElement('div');
+      messageContainer.id = 'romanize-no-lyrics-message';
+      messageContainer.style.cssText = `
+        padding: 20px;
+        text-align: center;
+        color: #aaa;
+        background: rgba(0,0,0,0.1);
+        border-radius: 8px;
+        margin: 10px;
+        border: 1px solid rgba(255,255,255,0.1);
+      `;
+      messageContainer.innerHTML = `
+        <div style="font-size: 16px; margin-bottom: 8px;">
+          📝 Romanize Button Active
+        </div>
+        <div style="font-size: 14px; opacity: 0.8;">
+          No lyrics available to romanize for this song
+        </div>
+        <div style="font-size: 12px; margin-top: 8px; opacity: 0.6;">
+          Try switching to a song with lyrics to use romanization
+        </div>
+      `;
+      
+      // Try to find and replace lyrics content area, or append to container
+      const lyricsArea = lyricsContainer.querySelector('yt-formatted-string') || 
+                        lyricsContainer.querySelector('.description') ||
+                        lyricsContainer;
+      
+      // Remove any existing message first
+      const existingMessage = document.querySelector('#romanize-no-lyrics-message');
+      if (existingMessage) {
+        existingMessage.remove();
+      }
+      
+      if (lyricsArea && lyricsArea !== lyricsContainer) {
+        lyricsArea.innerHTML = '';
+        lyricsArea.appendChild(messageContainer);
+      } else {
+        lyricsContainer.appendChild(messageContainer);
+      }
+    } else {
+      console.log('Could not find suitable container for no-lyrics message');
+    }
     return;
   }
 
@@ -464,32 +507,33 @@ function ensureLyricsRestored() {
 async function shouldShowRomanizeButton() {
   console.log('=== DEBUG: shouldShowRomanizeButton called ===');
   
-  // First, try to find and cache lyrics if not already done
+  // Force show the romanize button at all times
+  console.log('✅ Forcing romanize button to show at all times');
+  
+  // Still try to find and cache lyrics for functionality, but don't let it block the button
   const lyricsFound = await findAndStoreLyrics();
   console.log('findAndStoreLyrics result:', lyricsFound);
   
-  if (!lyricsFound) {
-    console.log('❌ No lyrics found, hiding romanize button');
-    return false;
+  if (lyricsFound) {
+    const lyricsText = originalLyricsText || (lyricsElement ? lyricsElement.textContent : '');
+    console.log('Lyrics text source:', originalLyricsText ? 'originalLyricsText' : 'lyricsElement.textContent');
+    console.log('Lyrics text length:', lyricsText.length);
+    console.log('Lyrics text preview (first 100 chars):', lyricsText.substring(0, 100));
+    
+    const nonLatinText = extractNonLatinText(lyricsText);
+    console.log('extractNonLatinText result:', nonLatinText);
+    
+    if (nonLatinText) {
+      console.log('✅ Non-Latin text found for romanization');
+      console.log('Non-Latin text preview:', nonLatinText.substring(0, 50));
+    } else {
+      console.log('ℹ️ Lyrics are in English characters, but button will still show');
+    }
+  } else {
+    console.log('ℹ️ No lyrics found, but button will still show');
   }
 
-  // Check if lyrics contain non-Latin text that needs romanization
-  const lyricsText = originalLyricsText || (lyricsElement ? lyricsElement.textContent : '');
-  console.log('Lyrics text source:', originalLyricsText ? 'originalLyricsText' : 'lyricsElement.textContent');
-  console.log('Lyrics text length:', lyricsText.length);
-  console.log('Lyrics text preview (first 100 chars):', lyricsText.substring(0, 100));
-  
-  const nonLatinText = extractNonLatinText(lyricsText);
-  console.log('extractNonLatinText result:', nonLatinText);
-  
-  if (!nonLatinText) {
-    console.log('⚠️ Lyrics are already in English characters, hiding romanize button');
-    return false;
-  }
-
-  console.log('✅ Non-Latin text found, showing romanize button');
-  console.log('Non-Latin text preview:', nonLatinText.substring(0, 50));
-  return true;
+  return true; // Always return true to force button to show
 }
 
 // Wait for the page to load and inject the Romanized lyrics button
@@ -497,42 +541,58 @@ async function injectRomanizedButton() {
   console.log('=== DEBUG: injectRomanizedButton called ===');
   console.log('Current URL:', window.location.href);
   
-  // Check if button already exists to avoid duplicates
+  // Check if button already exists to avoid duplicates - check multiple ways
   const existingButton = document.querySelector('#romanized-lyrics-btn');
-  if (existingButton) {
+  const existingButtonByClass = document.querySelector('.romanize-tab-button');
+  
+  if (existingButton || existingButtonByClass) {
     console.log('⚠️ Button already exists, skipping injection');
     return;
   }
-
-  // Check if lyrics are available and need romanization
-  const shouldShow = await shouldShowRomanizeButton();
-  console.log('shouldShowRomanizeButton result:', shouldShow);
   
-  if (!shouldShow) {
-    console.log('⚠️ Romanize button not needed - lyrics are already in English or not found');
+  // Add a temporary flag to prevent race conditions
+  if (window.romanizeButtonInjecting) {
+    console.log('⚠️ Button injection already in progress, skipping');
     return;
   }
-
-  // Find the lyrics tab to get the tab-content div
-  const allTabs = document.querySelectorAll('tp-yt-paper-tab');
-  let lyricsTab = null;
   
+  window.romanizeButtonInjecting = true;
+
+  // Always show the romanize button, no matter what
+  console.log('✅ Always showing romanize button regardless of conditions');
+
+  // Find the lyrics tab to inject the button, but fallback to any tab if needed
+  const allTabs = document.querySelectorAll('tp-yt-paper-tab');
+  let targetTab = null;
+  
+  // First try to find the lyrics tab
   for (const tab of allTabs) {
     const tabContent = tab.querySelector('.tab-content');
     if (tabContent && tabContent.textContent.trim().includes('Lyrics')) {
-      lyricsTab = tab;
+      targetTab = tab;
+      console.log('✅ Found lyrics tab for button injection');
       break;
     }
   }
   
-  if (!lyricsTab) {
-    console.log('❌ Lyrics tab not found for button injection');
+  // If no lyrics tab, use any available tab
+  if (!targetTab && allTabs.length > 0) {
+    targetTab = allTabs[0];
+    console.log('⚠️ No lyrics tab found, using first available tab:', targetTab.textContent.trim());
+  }
+  
+  if (!targetTab) {
+    console.log('❌ No tabs found at all for button injection, retrying in 1 second...');
+    window.romanizeButtonInjecting = false;
+    setTimeout(() => injectRomanizedButton(), 1000);
     return;
   }
 
-  const tabContentDiv = lyricsTab.querySelector('.tab-content');
+  const tabContentDiv = targetTab.querySelector('.tab-content');
   if (!tabContentDiv) {
-    console.log('❌ Tab content div not found for button injection');
+    console.log('❌ Tab content div not found, retrying in 1 second...');
+    window.romanizeButtonInjecting = false;
+    setTimeout(() => injectRomanizedButton(), 1000);
     return;
   }
 
@@ -562,6 +622,9 @@ async function injectRomanizedButton() {
   // Insert the button into the tab-content div below the "Lyrics" text
   tabContentDiv.appendChild(romanizedButton);
   console.log('✅ Romanize button injected successfully');
+  
+  // Clear the injection flag
+  window.romanizeButtonInjecting = false;
 }
 
 // Run when DOM is ready
@@ -622,6 +685,9 @@ function resetExtensionState() {
   } else {
     console.log('ℹ️ No existing romanize button to remove');
   }
+  
+  // Clear any injection flags
+  window.romanizeButtonInjecting = false;
 }
 
 // Also run when navigating to new songs (YouTube Music is a SPA)
@@ -664,13 +730,33 @@ function handleUrlChange() {
     // Reset all extension state for the new song
     resetExtensionState();
     
-    // No need to refresh - state restoration is working perfectly
-    console.log('✅ Extension state reset complete, proceeding without refresh');
-    console.log('Scheduling button injection in 5 seconds to allow new lyrics to load...');
-    setTimeout(() => {
-      console.log('⏰ Timeout reached, calling injectRomanizedButton...');
-      injectRomanizedButton();
-    }, 5000); // Longer delay to allow new lyrics to fully load
+    // Check if user is currently on the lyrics tab
+    const activeTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+    const isOnLyricsTab = activeTab && activeTab.querySelector('.tab-content')?.textContent.trim().includes('Lyrics');
+    
+    if (isOnLyricsTab) {
+      console.log('✅ User is on lyrics tab, performing tab switch workaround first');
+      // Perform tab switching to reload lyrics, then inject button
+      setTimeout(async () => {
+        console.log('🔄 Performing tab switch workaround for new song...');
+        const tabSwitchSuccess = await reloadLyricsWithTabSwitch();
+        if (tabSwitchSuccess) {
+          console.log('⚡ Tab switch successful, injecting button immediately...');
+          injectRomanizedButton();
+        } else {
+          console.log('⚠️ Tab switch failed, using fallback injection...');
+          setTimeout(() => {
+            injectRomanizedButton();
+          }, 2000);
+        }
+      }, 300); // Small delay to let URL change settle
+    } else {
+      console.log('⏰ User not on lyrics tab, using normal delay');
+      setTimeout(() => {
+        console.log('⏰ Timeout reached, calling injectRomanizedButton...');
+        injectRomanizedButton();
+      }, 5000); // Longer delay to allow new lyrics to fully load
+    }
   }
 }
 
