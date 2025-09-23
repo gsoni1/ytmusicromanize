@@ -3,6 +3,9 @@ let originalLyricsContent = null;
 let originalLyricsText = null; // Cache the original text content
 let lyricsElement = null;
 
+// Flag to track if we need to perform tab switch when user goes to lyrics tab
+let needsTabSwitchOnLyricsEntry = false;
+
 // No popup message handling needed for romanization-only functionality
 
 // Cache for romanized lyrics (cleared when URL changes)
@@ -861,6 +864,9 @@ function resetExtensionState() {
   
   // Clear any injection flags
   window.romanizeButtonInjecting = false;
+  
+  // Clear deferred tab switch flag
+  needsTabSwitchOnLyricsEntry = false;
 }
 
 // Also run when navigating to new songs (YouTube Music is a SPA)
@@ -903,7 +909,7 @@ function handleUrlChange() {
     // Reset all extension state for the new song
     resetExtensionState();
     
-    // Check if we should perform tab switching (only for lyrics tab)
+    // Check current tab and decide on tab switching strategy
     const activeTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
     const rawTabText = activeTab ? activeTab.querySelector('.tab-content')?.textContent.trim() : 'Unknown';
     const originalTabText = rawTabText.replace(/\s+/g, ' ').trim(); // Normalize whitespace
@@ -911,7 +917,7 @@ function handleUrlChange() {
     console.log('📍 Original tab text (normalized):', `"${originalTabText}"`);
     
     if (originalTabText.includes('Lyrics')) {
-      console.log('✅ User is on Lyrics tab, performing tab switch workaround');
+      console.log('✅ User is on Lyrics tab, performing immediate tab switch workaround');
       
       setTimeout(async () => {
         console.log('🔄 Performing tab switch workaround for lyrics tab...');
@@ -929,8 +935,11 @@ function handleUrlChange() {
         }
       }, 300); // Small delay to let URL change settle
     } else {
-      console.log('ℹ️ User not on Lyrics tab, skipping tab switch workaround');
-      console.log('⏰ Using standard injection timing for:', originalTabText);
+      console.log('ℹ️ User not on Lyrics tab, setting flag for deferred tab switch');
+      console.log('🔖 Will perform tab switch when user navigates to Lyrics tab');
+      
+      // Set flag to perform tab switch later when user goes to lyrics tab
+      needsTabSwitchOnLyricsEntry = true;
       
       // Use standard delay for non-lyrics tabs
       setTimeout(() => {
@@ -958,10 +967,40 @@ const observer = new MutationObserver((mutations) => {
         }
       });
     }
+    
+    // Check for tab switching (aria-selected attribute changes)
+    if (mutation.type === 'attributes' && mutation.attributeName === 'aria-selected') {
+      const targetTab = mutation.target;
+      if (targetTab.tagName === 'TP-YT-PAPER-TAB' && targetTab.getAttribute('aria-selected') === 'true') {
+        const tabContent = targetTab.querySelector('.tab-content');
+        if (tabContent) {
+          const tabText = tabContent.textContent.trim().replace(/\s+/g, ' ').trim();
+          console.log('🔄 Tab switch detected to:', tabText);
+          
+          // Check if user switched to Lyrics tab and we need to perform deferred tab switch
+          if (tabText.includes('Lyrics') && needsTabSwitchOnLyricsEntry) {
+            console.log('🔖 Performing deferred tab switch for new song on lyrics entry...');
+            needsTabSwitchOnLyricsEntry = false; // Clear the flag
+            
+            setTimeout(async () => {
+              console.log('🔄 Executing deferred tab switch workaround...');
+              const tabSwitchSuccess = await performUniversalTabSwitch(tabText);
+              if (tabSwitchSuccess) {
+                console.log('⚡ Deferred tab switch successful!');
+              } else {
+                console.log('⚠️ Deferred tab switch failed');
+              }
+            }, 500); // Small delay to let tab switch settle
+          }
+        }
+      }
+    }
   });
 });
 
 observer.observe(document.body, {
   childList: true,
-  subtree: true
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['aria-selected']
 });
