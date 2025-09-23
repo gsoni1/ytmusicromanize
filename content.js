@@ -558,7 +558,7 @@ async function showRomanizedLyrics() {
   // Check if we have cached romanized text for this URL
   if (romanizedCache.url === currentUrl && romanizedCache.text) {
     console.log('Using cached romanized text');
-    displayRomanizedLyrics(originalText, romanizedCache.text, 'Romanized lyrics • Cached');
+    displayRomanizedLyrics(originalText, romanizedCache.text, 'Pronunciation lyrics • Cached');
     return;
   }
   
@@ -587,7 +587,7 @@ async function showRomanizedLyrics() {
     romanizedCache.text = romanizedText;
     console.log('Cached romanized text for URL:', currentUrl);
     
-    displayRomanizedLyrics(originalText, romanizedText, 'Romanized lyrics • Multi-language support');
+    displayRomanizedLyrics(originalText, romanizedText, 'Pronunciation lyrics • Multi-language support');
     
   } catch (error) {
     console.error('Error romanizing lyrics:', error);
