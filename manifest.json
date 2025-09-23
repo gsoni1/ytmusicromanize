@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Music Romanize",
+  "name": "YouTube Music Pronunciation",
   "version": "1.0",
-  "description": "Adds a romanize lyrics button to YouTube Music for non-Latin scripts",
+  "description": "Add lyrics pronunciation support to YouTube Music, making non-Latin lyrics readable in Roman script",
   "permissions": [
     "activeTab",
     "scripting",
