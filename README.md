@@ -1,12 +1,15 @@
 # YouTube Music Pronunciation 🎵✨
 
 A Chrome extension that brings Apple Music’s Lyrics Pronunciation feature to YouTube Music—making non-Latin lyrics instantly readable in Roman script.
+<img width="512" height="512" alt="translate" src="https://github.com/user-attachments/assets/6818e9d8-5d0c-448c-b1f3-649f730c2f0c" />
+
 
 # Overview
 
 In iOS 26, Apple Music introduced Lyrics Translation and Lyrics Pronunciation to help users understand and sing along to global music more easily:
 - Lyrics Translation → Shows real-time translated lyrics in the listener’s preferred language.
 -	Lyrics Pronunciation → Shows romanized (phonetic) versions of lyrics, making it possible to sing along even if you don’t know the script.
+
 
 These features, however, are:
 -	Limited to Apple Music on iPhone and iPad
@@ -15,6 +18,9 @@ These features, however, are:
 
 That’s where YouTube Music Pronunciation comes in.
 It’s a Chrome extension that brings Apple’s Lyrics Pronunciation-style feature to YouTube Music, so anyone can sing along to their favorite songs—no matter the language.
+
+## Product Requirements Document
+[See the Google Doc](https://docs.google.com/document/d/1McLgF1g6tEx20a9VMyY3OYQBinygNNL3Ss5E4g-qYyg/edit?usp=sharing) 
 
 # ✨ Features
 
