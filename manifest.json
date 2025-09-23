@@ -2,7 +2,10 @@
   "manifest_version": 3,
   "name": "YouTube Music Pronunciation",
   "version": "1.0",
-  "description": "Add lyrics pronunciation support to YouTube Music, making non-Latin lyrics readable in Roman script",
+  "description": "Add lyrics pronunciation support to YouTube Music, making non-Latin lyrics readable in English characters",
+  "icons": {
+    "512": "translate.png"
+  },
   "permissions": [
     "activeTab",
     "scripting",
