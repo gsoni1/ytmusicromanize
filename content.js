@@ -231,6 +231,166 @@ async function ensureLyricsTabActive() {
   return lyricsTab;
 }
 
+// Helper function to perform universal tab switch (from any tab to related and back)
+async function performUniversalTabSwitch(originalTabText) {
+  console.log('=== Attempting universal tab switch workaround ===');
+  console.log('Original tab:', originalTabText);
+  
+  // Find all available tabs
+  const allTabs = document.querySelectorAll('tp-yt-paper-tab');
+  let originalTab = null;
+  let availableTabs = [];
+  
+  // First pass: catalog all tabs
+  for (const tab of allTabs) {
+    const tabContent = tab.querySelector('.tab-content');
+    if (tabContent) {
+      const tabText = tabContent.textContent.trim();
+      const normalizedTabText = tabText.replace(/\s+/g, ' ').trim(); // Normalize whitespace
+      console.log('Found tab:', `"${tabText}"`, 'normalized:', `"${normalizedTabText}"`, 'aria-selected:', tab.getAttribute('aria-selected'));
+      
+      availableTabs.push({
+        element: tab,
+        text: normalizedTabText,
+        isOriginal: normalizedTabText === originalTabText || tabText === originalTabText
+      });
+      
+      // Find the original tab
+      if (normalizedTabText === originalTabText || tabText === originalTabText) {
+        originalTab = tab;
+        console.log('📍 Found original tab:', normalizedTabText);
+      }
+    }
+  }
+  
+  // Second pass: select tab to switch to (only Lyrics <-> Related switching)
+  let switchToTab = null;
+  
+  if (originalTabText.includes('Lyrics')) {
+    // If user is on Lyrics tab, switch to Related tab
+    for (const tabInfo of availableTabs) {
+      if (tabInfo.text.includes('Related')) {
+        switchToTab = tabInfo.element;
+        console.log('✅ User on Lyrics tab, will switch to Related tab');
+        break;
+      }
+    }
+  } else if (originalTabText.includes('Related')) {
+    // If user is on Related tab, switch to Lyrics tab  
+    for (const tabInfo of availableTabs) {
+      if (tabInfo.text.includes('Lyrics')) {
+        switchToTab = tabInfo.element;
+        console.log('✅ User on Related tab, will switch to Lyrics tab');
+        break;
+      }
+    }
+  } else {
+    // If user is on any other tab (like Up next), don't do tab switching
+    console.log('⚠️ User is on', originalTabText, 'tab - skipping tab switch (only works for Lyrics/Related)');
+    return false;
+  }
+  
+  if (!switchToTab) {
+    console.log('❌ No suitable tab found for switching');
+    return false;
+  }
+  
+  if (!originalTab) {
+    console.log('⚠️ Original tab not found, will switch back to first available tab');
+    originalTab = allTabs[0];
+  }
+  
+  // Verify current state
+  const currentlyActiveTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+  if (currentlyActiveTab) {
+    const activeTabText = currentlyActiveTab.querySelector('.tab-content')?.textContent.trim();
+    console.log('Currently active tab before switch:', activeTabText);
+  }
+  
+  // Switch to the alternative tab
+  const switchToTabText = switchToTab.querySelector('.tab-content')?.textContent.trim();
+  const normalizedSwitchText = switchToTabText.replace(/\s+/g, ' ').trim();
+  console.log('🔄 Switching to tab:', `"${switchToTabText}"`, 'normalized:', `"${normalizedSwitchText}"`);
+  console.log('🔄 About to click tab element:', switchToTab);
+  switchToTab.click();
+  
+  // Wait and verify the switch happened
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const newActiveTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+  if (newActiveTab) {
+    const newActiveTabText = newActiveTab.querySelector('.tab-content')?.textContent.trim();
+    console.log('✅ Successfully switched to:', newActiveTabText);
+  }
+  
+  // Wait on the other tab
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Switch back to original tab
+  console.log('🔄 Switching back to original tab:', originalTabText);
+  originalTab.click();
+  
+  // Wait and verify we're back
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const finalActiveTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+  if (finalActiveTab) {
+    const finalActiveTabText = finalActiveTab.querySelector('.tab-content')?.textContent.trim();
+    console.log('✅ Successfully switched back to:', finalActiveTabText);
+    
+    // Verify we're actually on the correct tab
+    if (!finalActiveTabText.includes(originalTabText)) {
+      console.log('⚠️ Tab switch verification failed - expected:', originalTabText, 'got:', finalActiveTabText);
+      // Try clicking the original tab again
+      console.log('🔄 Attempting to correct tab selection...');
+      originalTab.click();
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }
+  
+  // Wait longer for content to load and stabilize
+  console.log('⏳ Waiting for content to load and stabilize...');
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Additional verification - check what content is actually showing
+  const currentContent = document.querySelector('yt-formatted-string.non-expandable.description.style-scope.ytmusic-description-shelf-renderer');
+  if (currentContent) {
+    const contentPreview = currentContent.textContent.substring(0, 100);
+    console.log('📄 Current content preview:', contentPreview);
+  } else {
+    console.log('📄 No lyrics content found after tab switch');
+  }
+  
+  // Final verification and potential fix
+  if (originalTabText.includes('Lyrics')) {
+    console.log('🔍 Verifying lyrics tab is showing correct content...');
+    
+    // Check if we're still showing related content on lyrics tab
+    const pageType = document.querySelector('ytmusic-description-shelf-renderer')?.getAttribute('page-type');
+    console.log('📋 Page type attribute:', pageType);
+    
+    // If we detect we're showing wrong content, try one more refresh
+    if (!pageType || !pageType.includes('LYRICS')) {
+      console.log('⚠️ Detected incorrect content on lyrics tab, attempting refresh...');
+      
+      // Try switching to Related and back one more time with longer delays
+      const relatedTab = Array.from(document.querySelectorAll('tp-yt-paper-tab')).find(tab => 
+                          tab.querySelector('.tab-content')?.textContent.trim().includes('Related'));
+      
+      if (relatedTab) {
+        console.log('🔄 Emergency refresh: switching to Related...');
+        relatedTab.click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('🔄 Emergency refresh: switching back to Lyrics...');
+        originalTab.click();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+  }
+  
+  console.log('✅ Universal tab switch workaround completed');
+  return true;
+}
+
 // Helper function to reload lyrics by switching tabs
 async function reloadLyricsWithTabSwitch() {
   console.log('=== Attempting tab switch workaround to reload lyrics ===');
@@ -623,6 +783,19 @@ async function injectRomanizedButton() {
   tabContentDiv.appendChild(romanizedButton);
   console.log('✅ Romanize button injected successfully');
   
+  // Verify the button is actually in the DOM
+  setTimeout(() => {
+    const verifyButton = document.querySelector('#romanized-lyrics-btn');
+    if (verifyButton) {
+      console.log('✅ Button verification: Button is present in DOM');
+      console.log('Button element:', verifyButton);
+      console.log('Button parent:', verifyButton.parentElement);
+      console.log('Button visible:', verifyButton.offsetWidth > 0 && verifyButton.offsetHeight > 0);
+    } else {
+      console.log('❌ Button verification: Button NOT found in DOM after injection');
+    }
+  }, 100);
+  
   // Clear the injection flag
   window.romanizeButtonInjecting = false;
 }
@@ -730,32 +903,40 @@ function handleUrlChange() {
     // Reset all extension state for the new song
     resetExtensionState();
     
-    // Check if user is currently on the lyrics tab
+    // Check if we should perform tab switching (only for lyrics tab)
     const activeTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
-    const isOnLyricsTab = activeTab && activeTab.querySelector('.tab-content')?.textContent.trim().includes('Lyrics');
+    const rawTabText = activeTab ? activeTab.querySelector('.tab-content')?.textContent.trim() : 'Unknown';
+    const originalTabText = rawTabText.replace(/\s+/g, ' ').trim(); // Normalize whitespace
+    console.log('📍 Original tab text (raw):', `"${rawTabText}"`);
+    console.log('📍 Original tab text (normalized):', `"${originalTabText}"`);
     
-    if (isOnLyricsTab) {
-      console.log('✅ User is on lyrics tab, performing tab switch workaround first');
-      // Perform tab switching to reload lyrics, then inject button
+    if (originalTabText.includes('Lyrics')) {
+      console.log('✅ User is on Lyrics tab, performing tab switch workaround');
+      
       setTimeout(async () => {
-        console.log('🔄 Performing tab switch workaround for new song...');
-        const tabSwitchSuccess = await reloadLyricsWithTabSwitch();
+        console.log('🔄 Performing tab switch workaround for lyrics tab...');
+        
+        const tabSwitchSuccess = await performUniversalTabSwitch(originalTabText);
         if (tabSwitchSuccess) {
           console.log('⚡ Tab switch successful, injecting button immediately...');
           injectRomanizedButton();
         } else {
           console.log('⚠️ Tab switch failed, using fallback injection...');
           setTimeout(() => {
+            console.log('⏰ Fallback injection for lyrics tab...');
             injectRomanizedButton();
           }, 2000);
         }
       }, 300); // Small delay to let URL change settle
     } else {
-      console.log('⏰ User not on lyrics tab, using normal delay');
+      console.log('ℹ️ User not on Lyrics tab, skipping tab switch workaround');
+      console.log('⏰ Using standard injection timing for:', originalTabText);
+      
+      // Use standard delay for non-lyrics tabs
       setTimeout(() => {
-        console.log('⏰ Timeout reached, calling injectRomanizedButton...');
+        console.log('⏰ Standard injection for', originalTabText, 'tab...');
         injectRomanizedButton();
-      }, 5000); // Longer delay to allow new lyrics to fully load
+      }, 5000);
     }
   }
 }
