@@ -52,7 +52,12 @@ Unlike Apple Music’s limited language pairs, this extension supports romanizat
 -	Lightweight: Designed for speed and minimal performance impact.
 
 # Screenshots
-Before & After (Apple-style Pronunciation in YouTube Music):
+Before:
+<img width="1825" height="1176" alt="Screenshot 2025-09-23 at 3 19 42 PM" src="https://github.com/user-attachments/assets/ec637550-ff18-4895-af60-123c92f202cc" />
+After:
+<img width="1825" height="1176" alt="Screenshot 2025-09-23 at 3 19 38 PM" src="https://github.com/user-attachments/assets/b6dd23fb-72d9-40b6-b273-4bcb363a18e6" />
+
+
 
 # 🔧 Installation
 1.	Clone or download this repository.
