@@ -84,33 +84,245 @@ async function romanizeText(text) {
 }
 
 
-// Function to find and store lyrics
-function findAndStoreLyrics() {
+// Function to find and store lyrics with tab switching workaround
+async function findAndStoreLyrics() {
   const lyricsSelector = 'yt-formatted-string.non-expandable.description.style-scope.ytmusic-description-shelf-renderer';
-  lyricsElement = document.querySelector(lyricsSelector);
-
+  
+  console.log('=== DEBUG: findAndStoreLyrics called ===');
+  console.log('Current URL:', window.location.href);
   console.log('Looking for lyrics with selector:', lyricsSelector);
+  
+  // First, ensure we're on the lyrics tab
+  const lyricsTab = await ensureLyricsTabActive();
+  if (!lyricsTab) {
+    console.log('❌ Could not find or activate lyrics tab');
+    return false;
+  }
+  
+  // First, check if YouTube Music is showing "Lyrics not available" message
+  const noLyricsMessage = document.querySelector('yt-formatted-string.text.style-scope.ytmusic-message-renderer');
+  if (noLyricsMessage && noLyricsMessage.textContent.includes('Lyrics not available')) {
+    console.log('❌ YouTube Music shows "Lyrics not available" message');
+    return false;
+  }
+  
+  // Check if element exists in DOM
+  lyricsElement = document.querySelector(lyricsSelector);
   console.log('Found lyrics element:', lyricsElement);
-
+  
+  // Additional debugging - check for similar elements
+  const allDescriptionElements = document.querySelectorAll('yt-formatted-string');
+  console.log('Total yt-formatted-string elements found:', allDescriptionElements.length);
+  
+  const descriptionShelfElements = document.querySelectorAll('ytmusic-description-shelf-renderer');
+  console.log('Description shelf renderers found:', descriptionShelfElements.length);
+  
   if (lyricsElement) {
+    console.log('Lyrics element details:');
+    console.log('- Tag name:', lyricsElement.tagName);
+    console.log('- Class list:', lyricsElement.classList.toString());
+    console.log('- Parent element:', lyricsElement.parentElement);
+    console.log('- Text content length:', lyricsElement.textContent.length);
+    console.log('- HTML content length:', lyricsElement.innerHTML.length);
+    console.log('- Has is-empty attribute:', lyricsElement.hasAttribute('is-empty'));
+    
+    // Check if lyrics element is loaded and has content
+    const hasContent = lyricsElement.textContent.trim().length > 0;
+    const isNotEmpty = !lyricsElement.hasAttribute('is-empty');
+    const isLoaded = hasContent && isNotEmpty;
+    
+    if (!isLoaded) {
+      console.log('⚠️ Lyrics element found but empty/loading, trying tab switch workaround...');
+      console.log('- Has content:', hasContent);
+      console.log('- Not marked as empty:', isNotEmpty);
+      
+      // Try the tab switching workaround
+      const reloadSuccessful = await reloadLyricsWithTabSwitch();
+      if (!reloadSuccessful) {
+        console.log('❌ Tab switch workaround failed');
+        return false;
+      }
+      
+      // Re-check the lyrics element after tab switch
+      lyricsElement = document.querySelector(lyricsSelector);
+      
+      // Also check if "Lyrics not available" message appeared after tab switch
+      const noLyricsMessageAfterSwitch = document.querySelector('yt-formatted-string.text.style-scope.ytmusic-message-renderer');
+      if (noLyricsMessageAfterSwitch && noLyricsMessageAfterSwitch.textContent.includes('Lyrics not available')) {
+        console.log('❌ "Lyrics not available" message shown after tab switch');
+        return false;
+      }
+      
+      if (!lyricsElement || lyricsElement.hasAttribute('is-empty') || lyricsElement.textContent.trim().length === 0) {
+        console.log('❌ Lyrics still not loaded after tab switch');
+        return false;
+      }
+      
+      console.log('✅ Tab switch workaround successful, lyrics now loaded');
+    }
+    
+    console.log('✅ Lyrics element is fully loaded with content');
+    
     // Only cache original content if we haven't already (to preserve the true original)
     if (originalLyricsContent === null) {
       originalLyricsContent = lyricsElement.innerHTML;
       originalLyricsText = lyricsElement.textContent;
-      console.log('Cached original lyrics content and text');
+      console.log('✅ Cached original lyrics content and text');
+      console.log('Original content length:', originalLyricsContent.length);
+      console.log('Original text length:', originalLyricsText.length);
+    } else {
+      console.log('⚠️ Original lyrics already cached, not overwriting');
+      console.log('Existing cached content length:', originalLyricsContent ? originalLyricsContent.length : 'null');
+      
+      // Check if the current lyrics match what we have cached
+      if (lyricsElement.textContent !== originalLyricsText) {
+        console.log('🔄 Current lyrics differ from cached - this might be a new song');
+        console.log('Current text preview:', lyricsElement.textContent.substring(0, 100) + '...');
+        console.log('Cached text preview:', originalLyricsText.substring(0, 100) + '...');
+        
+        // For new songs, we should clear cache and re-cache
+        originalLyricsContent = lyricsElement.innerHTML;
+        originalLyricsText = lyricsElement.textContent;
+        console.log('🔄 Re-cached new song lyrics');
+      }
     }
+    
     console.log('Lyrics content preview:', lyricsElement.textContent.substring(0, 100) + '...');
     return true;
   }
-  console.log('No lyrics found');
+  
+  console.log('❌ No lyrics found with main selector');
   return false;
+}
+
+// Helper function to ensure lyrics tab is active
+async function ensureLyricsTabActive() {
+  console.log('=== Ensuring lyrics tab is active ===');
+  
+  // Look for the lyrics tab
+  let lyricsTab = null;
+  const allTabs = document.querySelectorAll('tp-yt-paper-tab');
+  console.log('Found', allTabs.length, 'tabs total');
+  
+  for (const tab of allTabs) {
+    const tabContent = tab.querySelector('.tab-content');
+    if (tabContent) {
+      const tabText = tabContent.textContent.trim();
+      console.log('Tab text:', tabText, 'aria-selected:', tab.getAttribute('aria-selected'));
+      if (tabText.includes('Lyrics')) {
+        lyricsTab = tab;
+        console.log('✅ Found lyrics tab');
+        break;
+      }
+    }
+  }
+  
+  if (!lyricsTab) {
+    console.log('❌ Lyrics tab not found');
+    return null;
+  }
+  
+  // Check if we're already on the lyrics tab using aria-selected
+  if (lyricsTab.getAttribute('aria-selected') === 'true') {
+    console.log('✅ Already on lyrics tab');
+    return lyricsTab;
+  }
+  
+  // Click the lyrics tab
+  console.log('📌 Clicking lyrics tab to activate it...');
+  lyricsTab.click();
+  
+  // Wait for tab to become active and verify
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Verify the tab is now active
+  if (lyricsTab.getAttribute('aria-selected') === 'true') {
+    console.log('✅ Successfully activated lyrics tab');
+  } else {
+    console.log('⚠️ Lyrics tab may not have activated properly');
+  }
+  
+  return lyricsTab;
+}
+
+// Helper function to reload lyrics by switching tabs
+async function reloadLyricsWithTabSwitch() {
+  console.log('=== Attempting tab switch workaround to reload lyrics ===');
+  
+  // Find a non-lyrics tab to switch to temporarily
+  const allTabs = document.querySelectorAll('tp-yt-paper-tab');
+  let relatedTab = null;
+  let lyricsTab = null;
+  
+  for (const tab of allTabs) {
+    const tabContent = tab.querySelector('.tab-content');
+    if (tabContent) {
+      const tabText = tabContent.textContent.trim();
+      console.log('Found tab:', tabText, 'aria-selected:', tab.getAttribute('aria-selected'));
+      
+      if (tabText.includes('Lyrics')) {
+        lyricsTab = tab;
+      } else if (tabText.includes('Up next') || tabText.includes('Related')) {
+        relatedTab = tab;
+        console.log('✅ Found non-lyrics tab for switching:', tabText);
+      }
+    }
+  }
+  
+  if (!relatedTab) {
+    console.log('❌ No suitable tab found for switching');
+    return false;
+  }
+  
+  if (!lyricsTab) {
+    console.log('❌ Lyrics tab not found for switching back');
+    return false;
+  }
+  
+  // Verify we're currently on the lyrics tab
+  const currentlyActiveTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+  if (currentlyActiveTab) {
+    const activeTabText = currentlyActiveTab.querySelector('.tab-content')?.textContent.trim();
+    console.log('Currently active tab before switch:', activeTabText);
+  }
+  
+  // Switch to the related tab
+  console.log('🔄 Switching to related tab...');
+  relatedTab.click();
+  
+  // Wait and verify the switch happened
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const newActiveTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+  if (newActiveTab) {
+    const newActiveTabText = newActiveTab.querySelector('.tab-content')?.textContent.trim();
+    console.log('✅ Successfully switched to:', newActiveTabText);
+  }
+  
+  // Switch back to lyrics tab
+  console.log('🔄 Switching back to lyrics tab...');
+  lyricsTab.click();
+  
+  // Wait and verify we're back on lyrics
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const finalActiveTab = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+  if (finalActiveTab) {
+    const finalActiveTabText = finalActiveTab.querySelector('.tab-content')?.textContent.trim();
+    console.log('✅ Successfully switched back to:', finalActiveTabText);
+  }
+  
+  // Wait for lyrics to load after switching back
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  console.log('✅ Tab switch workaround completed');
+  return true;
 }
 
 // Function to show romanized lyrics
 async function showRomanizedLyrics() {
   console.log('showRomanizedLyrics called');
   
-  if (!findAndStoreLyrics()) {
+  const lyricsFound = await findAndStoreLyrics();
+  if (!lyricsFound) {
     console.log('Lyrics not found, retrying...');
     setTimeout(showRomanizedLyrics, 1000);
     return;
@@ -229,40 +441,82 @@ function displayRomanizedLyrics(originalText, romanizedText, statusMessage) {
 function showOriginalLyrics() {
   if (lyricsElement && originalLyricsContent) {
     lyricsElement.innerHTML = originalLyricsContent;
+    console.log('Reverted to original lyrics');
   }
 }
 
+// Emergency function to ensure lyrics are restored
+function ensureLyricsRestored() {
+  if (lyricsElement && originalLyricsContent) {
+    try {
+      lyricsElement.innerHTML = originalLyricsContent;
+      console.log('Emergency lyrics restoration successful');
+      return true;
+    } catch (error) {
+      console.log('Emergency lyrics restoration failed:', error);
+      return false;
+    }
+  }
+  return false;
+}
+
 // Function to check if the romanize button should be shown
-function shouldShowRomanizeButton() {
+async function shouldShowRomanizeButton() {
+  console.log('=== DEBUG: shouldShowRomanizeButton called ===');
+  
   // First, try to find and cache lyrics if not already done
-  if (!findAndStoreLyrics()) {
-    console.log('No lyrics found, hiding romanize button');
+  const lyricsFound = await findAndStoreLyrics();
+  console.log('findAndStoreLyrics result:', lyricsFound);
+  
+  if (!lyricsFound) {
+    console.log('❌ No lyrics found, hiding romanize button');
     return false;
   }
 
   // Check if lyrics contain non-Latin text that needs romanization
-  const lyricsText = originalLyricsText || lyricsElement.textContent;
+  const lyricsText = originalLyricsText || (lyricsElement ? lyricsElement.textContent : '');
+  console.log('Lyrics text source:', originalLyricsText ? 'originalLyricsText' : 'lyricsElement.textContent');
+  console.log('Lyrics text length:', lyricsText.length);
+  console.log('Lyrics text preview (first 100 chars):', lyricsText.substring(0, 100));
+  
   const nonLatinText = extractNonLatinText(lyricsText);
+  console.log('extractNonLatinText result:', nonLatinText);
   
   if (!nonLatinText) {
-    console.log('Lyrics are already in English characters, hiding romanize button');
+    console.log('⚠️ Lyrics are already in English characters, hiding romanize button');
     return false;
   }
 
-  console.log('Non-Latin text found, showing romanize button');
+  console.log('✅ Non-Latin text found, showing romanize button');
+  console.log('Non-Latin text preview:', nonLatinText.substring(0, 50));
   return true;
 }
 
 // Wait for the page to load and inject the Romanized lyrics button
-function injectRomanizedButton() {
+async function injectRomanizedButton() {
+  console.log('=== DEBUG: injectRomanizedButton called ===');
+  console.log('Current URL:', window.location.href);
+  
   // Check if button already exists to avoid duplicates
-  if (document.querySelector('#romanized-lyrics-btn')) {
+  const existingButton = document.querySelector('#romanized-lyrics-btn');
+  if (existingButton) {
+    console.log('⚠️ Button already exists, skipping injection');
     return;
   }
 
-  // Look for the lyrics tab
-  let lyricsTab = null;
+  // Check if lyrics are available and need romanization
+  const shouldShow = await shouldShowRomanizeButton();
+  console.log('shouldShowRomanizeButton result:', shouldShow);
+  
+  if (!shouldShow) {
+    console.log('⚠️ Romanize button not needed - lyrics are already in English or not found');
+    return;
+  }
+
+  // Find the lyrics tab to get the tab-content div
   const allTabs = document.querySelectorAll('tp-yt-paper-tab');
+  let lyricsTab = null;
+  
   for (const tab of allTabs) {
     const tabContent = tab.querySelector('.tab-content');
     if (tabContent && tabContent.textContent.trim().includes('Lyrics')) {
@@ -272,21 +526,13 @@ function injectRomanizedButton() {
   }
   
   if (!lyricsTab) {
-    // If lyrics tab not found, try again after a short delay
-    setTimeout(injectRomanizedButton, 1000);
+    console.log('❌ Lyrics tab not found for button injection');
     return;
   }
 
-  // Find the tab-content div where we'll add the button
   const tabContentDiv = lyricsTab.querySelector('.tab-content');
   if (!tabContentDiv) {
-    setTimeout(injectRomanizedButton, 1000);
-    return;
-  }
-
-  // Check if lyrics are available and need romanization
-  if (!shouldShowRomanizeButton()) {
-    console.log('Romanize button not needed - lyrics are already in English or not found');
+    console.log('❌ Tab content div not found for button injection');
     return;
   }
 
@@ -315,84 +561,118 @@ function injectRomanizedButton() {
 
   // Insert the button into the tab-content div below the "Lyrics" text
   tabContentDiv.appendChild(romanizedButton);
+  console.log('✅ Romanize button injected successfully');
 }
 
 // Run when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', injectRomanizedButton);
+  document.addEventListener('DOMContentLoaded', () => injectRomanizedButton());
 } else {
   injectRomanizedButton();
 }
 
 // Function to reset all state when song changes
 function resetExtensionState() {
-  console.log('Resetting extension state for new song');
+  console.log('=== DEBUG: resetExtensionState called ===');
+  console.log('Current state:');
+  console.log('- lyricsElement exists:', !!lyricsElement);
+  console.log('- originalLyricsContent exists:', !!originalLyricsContent);
+  console.log('- originalLyricsText exists:', !!originalLyricsText);
+  console.log('- romanizedCache.url:', romanizedCache.url);
+  console.log('- romanizedCache.text exists:', !!romanizedCache.text);
   
-  // If we have a lyrics element that was modified, try to restore it
+  // If we have a lyrics element that was modified, restore it immediately
   if (lyricsElement && originalLyricsContent) {
-    console.log('Restoring original lyrics content before reset');
+    console.log('🔄 Attempting to restore original lyrics content...');
+    console.log('Lyrics element still in DOM:', document.contains(lyricsElement));
+    console.log('Original content length:', originalLyricsContent.length);
+    
     try {
       lyricsElement.innerHTML = originalLyricsContent;
+      console.log('✅ Successfully restored original lyrics');
+      
+      // Verify restoration
+      const currentContent = lyricsElement.innerHTML;
+      console.log('Verification - current content length:', currentContent.length);
+      console.log('Content matches original:', currentContent === originalLyricsContent);
+      
     } catch (error) {
-      console.log('Could not restore lyrics content:', error);
+      console.log('❌ Could not restore lyrics content:', error);
     }
+  } else {
+    console.log('⚠️ No lyrics to restore (lyricsElement:', !!lyricsElement, ', originalLyricsContent:', !!originalLyricsContent, ')');
   }
   
   // Clear cached romanized text
   romanizedCache.url = null;
   romanizedCache.text = null;
+  console.log('🧹 Cleared romanized cache');
   
   // Clear stored lyrics references
   originalLyricsContent = null;
   originalLyricsText = null;
   lyricsElement = null;
+  console.log('🧹 Cleared lyrics references');
   
   // Remove any existing button since we'll re-evaluate if it's needed
   const existingRomanizedButton = document.querySelector('#romanized-lyrics-btn');
   if (existingRomanizedButton) {
     existingRomanizedButton.remove();
-    console.log('Removed existing romanize button for new song');
+    console.log('🧹 Removed existing romanize button for new song');
+  } else {
+    console.log('ℹ️ No existing romanize button to remove');
   }
-  
-  // Force a refresh of the lyrics area to ensure new content is visible
-  setTimeout(() => {
-    const lyricsSelector = 'yt-formatted-string.non-expandable.description.style-scope.ytmusic-description-shelf-renderer';
-    const currentLyricsElement = document.querySelector(lyricsSelector);
-    if (currentLyricsElement) {
-      console.log('Found new song lyrics element, ensuring it\'s visible');
-      // Trigger a refresh by temporarily hiding and showing
-      const originalDisplay = currentLyricsElement.style.display;
-      currentLyricsElement.style.display = 'none';
-      setTimeout(() => {
-        currentLyricsElement.style.display = originalDisplay;
-      }, 10);
-    }
-  }, 1000);
 }
 
 // Also run when navigating to new songs (YouTube Music is a SPA)
 let currentUrl = location.href;
+
+// Use both setInterval and navigation event listeners for better coverage
 setInterval(() => {
   if (location.href !== currentUrl) {
-    currentUrl = location.href;
-    console.log('URL changed to:', currentUrl);
+    handleUrlChange();
+  }
+}, 1000);
+
+// Also listen for popstate events (back/forward navigation)
+window.addEventListener('popstate', handleUrlChange);
+
+// Emergency restoration before page unload
+window.addEventListener('beforeunload', () => {
+  console.log('Page unloading, attempting emergency lyrics restoration');
+  ensureLyricsRestored();
+});
+
+function handleUrlChange() {
+  const newUrl = location.href;
+  if (newUrl !== currentUrl) {
+    console.log('=== DEBUG: URL CHANGE DETECTED ===');
+    console.log('Old URL:', currentUrl);
+    console.log('New URL:', newUrl);
+    
+    currentUrl = newUrl;
     
     // Check if we have cached data (meaning the button was used)
     const hadCachedData = romanizedCache.url !== null && romanizedCache.text !== null;
+    const hadModifiedLyrics = lyricsElement && originalLyricsContent;
+    
+    console.log('Pre-reset state check:');
+    console.log('- hadCachedData:', hadCachedData);
+    console.log('- hadModifiedLyrics:', hadModifiedLyrics);
+    console.log('- romanizedCache.url:', romanizedCache.url);
     
     // Reset all extension state for the new song
     resetExtensionState();
     
-    // Only refresh if the extension was used (had cached romanized text)
-    if (hadCachedData) {
-      console.log('Extension was used on previous song, refreshing page for clean state...');
-      window.location.reload();
-    } else {
-      console.log('Extension was not used on previous song, no refresh needed');
-      setTimeout(injectRomanizedButton, 2000); // Delay to allow page to load
-    }
+    // No need to refresh - state restoration is working perfectly
+    console.log('✅ Extension state reset complete, proceeding without refresh');
+    console.log('Scheduling button injection in 5 seconds to allow new lyrics to load...');
+    setTimeout(() => {
+      console.log('⏰ Timeout reached, calling injectRomanizedButton...');
+      injectRomanizedButton();
+    }, 5000); // Longer delay to allow new lyrics to fully load
   }
-}, 1000);
+}
 
 // Watch for changes in the DOM (in case the lyrics tab loads dynamically)
 const observer = new MutationObserver((mutations) => {
@@ -406,7 +686,7 @@ const observer = new MutationObserver((mutations) => {
             node.classList && node.classList.contains('tab-header') ||
             node.querySelector('.tab-content')
           )) {
-            setTimeout(injectRomanizedButton, 500);
+            setTimeout(() => injectRomanizedButton(), 500);
           }
         }
       });

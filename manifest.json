@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Music Romanize",
-  "version": "1.0",
+  "version": "2.4",
   "description": "Adds a romanize lyrics button to YouTube Music for non-Latin scripts",
   "permissions": [
     "activeTab",
