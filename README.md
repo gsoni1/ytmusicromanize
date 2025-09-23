@@ -10,6 +10,7 @@ In iOS 26, Apple Music introduced Lyrics Translation and Lyrics Pronunciation to
 - Lyrics Translation → Shows real-time translated lyrics in the listener’s preferred language.
 -	Lyrics Pronunciation → Shows romanized (phonetic) versions of lyrics, making it possible to sing along even if you don’t know the script.
 
+<img src="https://github.com/gsoni1/YouTube-Music-Pronunciation/blob/main/Apple-WWDC25-iOS-26-Music-Lyric-Pronunciation-250609.jpg" width=40% height=50%> <img src="https://github.com/gsoni1/YouTube-Music-Pronunciation/blob/main/Apple-WWDC25-iOS-26-Music-Lyric-Translation-250609.jpg" width=40% height=50%>
 
 These features, however, are:
 -	Limited to Apple Music on iPhone and iPad
