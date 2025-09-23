@@ -764,7 +764,7 @@ async function injectRomanizedButton() {
   romanizedButton.id = 'romanized-lyrics-btn';
   romanizedButton.className = 'romanize-tab-button style-scope tp-yt-paper-tab';
   romanizedButton.setAttribute('aria-pressed', 'false');
-  romanizedButton.textContent = 'Romanize';
+  romanizedButton.textContent = 'Pronunciation';
 
   // Add click event listener for romanization functionality
   romanizedButton.addEventListener('click', function(e) {
